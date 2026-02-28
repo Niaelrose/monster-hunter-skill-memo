@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>抽選結果メモツール</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">GitHub Pages Edition</p>
+        <h1>抽選結果メモツール</h1>
+        <p class="subtext">ブラウザだけで動く、仲間内向けのメモツールです。</p>
+      </div>
+      <div class="header-actions">
+        <button id="open-master-modal" class="btn btn-secondary" type="button">Master設定</button>
+        <button id="export-data-btn" class="btn btn-secondary" type="button">データを書き出し</button>
+        <label class="btn btn-secondary import-btn">
+          データを読み込み
+          <input id="import-data-input" type="file" accept="application/json" hidden>
+        </label>
+      </div>
+    </header>
+
+    <section class="control-panel glass-card">
+      <div class="control-grid">
+        <div class="control-block">
+          <label class="control-label" for="round-count">表示回数</label>
+          <select id="round-count" class="modern-select"></select>
+          <p class="control-help">1〜30回目まで表示できます。</p>
+        </div>
+
+        <div class="control-block">
+          <label class="control-label">必要スキル（シリーズ）</label>
+          <button id="open-series-modal" class="btn btn-secondary" type="button">シリーズ必要スキルを選択</button>
+          <div id="series-selected-chips" class="chips-wrap"></div>
+          <p class="control-help">最大10個まで選択できます。</p>
+        </div>
+
+        <div class="control-block">
+          <label class="control-label">必要スキル（グループ）</label>
+          <button id="open-group-modal" class="btn btn-secondary" type="button">グループ必要スキルを選択</button>
+          <div id="group-selected-chips" class="chips-wrap"></div>
+          <p class="control-help">最大10個まで選択できます。</p>
+        </div>
+
+        <div class="control-block action-block">
+          <label class="control-label">操作</label>
+          <div class="action-buttons">
+            <button id="save-cache-btn" class="btn btn-primary" type="button">保存</button>
+            <button id="clear-btn" class="btn btn-danger" type="button">メモをクリア</button>
+          </div>
+          <p id="save-message" class="control-help status-text"></p>
+        </div>
+      </div>
+
+      <div class="filter-panel">
+        <div class="filter-header">
+          <div>
+            <label class="control-label">武器種フィルター</label>
+            <p class="control-help no-margin">表示したい武器種だけに絞れます。</p>
+          </div>
+          <div class="filter-actions">
+            <button id="filter-select-all-btn" class="btn btn-secondary btn-small" type="button">全選択</button>
+            <button id="filter-clear-all-btn" class="btn btn-secondary btn-small" type="button">全解除</button>
+            <button id="filter-toggle-btn" class="btn btn-secondary btn-small" type="button">開閉</button>
+          </div>
+        </div>
+        <div id="weapon-filter-box" class="weapon-filter-box"></div>
+      </div>
+
+      <div class="legend-row">
+        <div class="legend-item"><span class="legend-dot legend-series"></span><span>シリーズ必要スキル一致</span></div>
+        <div class="legend-item"><span class="legend-dot legend-group"></span><span>グループ必要スキル一致</span></div>
+      </div>
+    </section>
+
+    <section class="table-section glass-card" id="desktop-section">
+      <div id="table-area" class="table-area">
+        <div class="table-scroll">
+          <table id="memo-table" class="memo-table"></table>
+        </div>
+      </div>
+    </section>
+
+    <section class="mobile-section glass-card hidden" id="mobile-section">
+      <div id="mobile-card-area" class="mobile-card-area"></div>
+    </section>
+  </div>
+
+  <div id="skill-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h2 id="modal-title">必要スキル選択</h2>
+          <p id="modal-subtext" class="modal-subtext">最大10個まで選択できます。</p>
+        </div>
+        <button id="close-modal-btn" class="icon-btn" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-search-wrap">
+          <input id="skill-search" class="modern-input" type="text" placeholder="スキル名で検索">
+        </div>
+        <div class="modal-toolbar">
+          <button id="modal-clear-selection-btn" class="btn btn-secondary" type="button">この分類の選択を解除</button>
+          <span id="modal-count-text" class="modal-count-text">0 / 10</span>
+        </div>
+        <div id="skill-list" class="skill-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-close-footer-btn" class="btn btn-primary" type="button">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="master-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog modal-dialog-wide">
+      <div class="modal-header">
+        <div>
+          <h2>Master設定</h2>
+          <p class="modal-subtext">1行に1件ずつ入力します。ここで設定した内容が候補一覧になります。</p>
+        </div>
+        <button id="close-master-modal-btn" class="icon-btn" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="master-grid">
+          <div>
+            <label class="control-label" for="master-weapons">武器種</label>
+            <textarea id="master-weapons" class="master-textarea" placeholder="大剣&#10;太刀&#10;片手剣"></textarea>
+          </div>
+          <div>
+            <label class="control-label" for="master-series">シリーズスキル</label>
+            <textarea id="master-series" class="master-textarea" placeholder="火竜の力&#10;白熾龍の脈動"></textarea>
+          </div>
+          <div>
+            <label class="control-label" for="master-group">グループスキル</label>
+            <textarea id="master-group" class="master-textarea" placeholder="鱗張りの技法&#10;守勢の構え"></textarea>
+          </div>
+        </div>
+        <p class="control-help">※ 空行は自動で無視され、重複は削除されます。</p>
+      </div>
+      <div class="modal-footer master-footer">
+        <div class="footer-left-buttons">
+          <button id="load-sample-master-btn" class="btn btn-secondary" type="button">サンプルを入れる</button>
+          <button id="reset-master-btn" class="btn btn-secondary" type="button">初期状態に戻す</button>
+        </div>
+        <div class="footer-right-buttons">
+          <button id="save-master-btn" class="btn btn-primary" type="button">Masterを保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
