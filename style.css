@@ -93,14 +93,17 @@ h1{margin:0;font-size:clamp(26px,4vw,36px);line-height:1.15}
 .round-control-row label{display:inline-flex;align-items:center;gap:6px;font-weight:700}
 .round-delete-btn{border:none;background:rgba(15,23,42,.08);border-radius:10px;padding:6px 8px;font-size:11px;cursor:pointer;color:#0f172a;font-weight:700}
 .round-tone-0{background:var(--row-label-1)!important}.round-tone-1{background:var(--row-label-2)!important}.round-tone-2{background:var(--row-label-3)!important}.round-tone-3{background:var(--row-label-4)!important}.round-tone-4{background:var(--row-label-5)!important}.round-tone-5{background:var(--row-label-6)!important}.round-tone-6{background:var(--row-label-7)!important}
-.memo-cell{padding:10px;min-height:196px}
+.memo-cell{padding:10px;min-height:unset}
 .cell-stack{display:grid;gap:10px}
-.skill-box{position:relative;background:rgba(248,250,252,.88);border:1px solid rgba(148,163,184,.18);border-radius:14px;padding:8px;min-height:176px}
+.skill-box{position:relative;background:rgba(248,250,252,.88);border:1px solid rgba(148,163,184,.18);border-radius:14px;padding:8px}
 .skill-box.series-match{background:var(--series-bg);border-color:var(--series-border);box-shadow:inset 0 0 0 1px rgba(37,99,235,.08)}
 .skill-box.group-match{background:var(--group-bg);border-color:var(--group-border);box-shadow:inset 0 0 0 1px rgba(16,185,129,.08)}
+.skill-box.has-entry{background:rgba(245, 158, 11, .08);border-color:rgba(245, 158, 11, .34);box-shadow:inset 0 0 0 1px rgba(245, 158, 11, .08)}
 .cell-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
 .cell-tab-btn{border:1px solid rgba(148,163,184,.24);background:rgba(255,255,255,.85);border-radius:12px;padding:8px 6px;font-size:12px;font-weight:800;cursor:pointer;color:#475569;transition:.16s ease}
 .cell-tab-btn.is-active{background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;border-color:transparent;box-shadow:0 8px 16px rgba(37,99,235,.18)}
+.cell-tab-btn.has-entry{background:rgba(245, 158, 11, .14);border-color:rgba(245, 158, 11, .36);color:#92400e}
+.cell-tab-btn.is-active.has-entry{background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#fff;border-color:transparent;box-shadow:0 8px 16px rgba(245, 158, 11, .22)}
 .tab-panel{display:none}
 .tab-panel.is-active{display:block}
 .skill-box-label{display:block;font-size:11px;font-weight:800;margin-bottom:6px;color:#475569;letter-spacing:.04em}
@@ -112,6 +115,7 @@ h1{margin:0;font-size:clamp(26px,4vw,36px);line-height:1.15}
 .suggest-empty{padding:12px;color:#64748b;font-size:13px}
 .completed-row td,.completed-row .skill-box,.completed-row .round-label{background:var(--complete-bg)!important;border-color:var(--complete-border)!important}
 .completed-row .skill-input,.completed-row .cell-tab-btn{opacity:.72}
+.completed-row .skill-box.has-entry,.completed-card .skill-box.has-entry{background:var(--complete-bg)!important;border-color:var(--complete-border)!important}
 .completed-row .weapon-card,.completed-card{background:var(--complete-bg)!important;border-color:var(--complete-border)!important}
 .completed-card .round-card-head{filter:grayscale(.45);opacity:.82}
 .mobile-card-area{display:grid;gap:14px}.round-card{background:rgba(255,255,255,.74);border:1px solid rgba(148,163,184,.18);border-radius:18px;overflow:hidden}

@@ -667,6 +667,7 @@ function createTabbedSkillBox(round, weapon, type) {
 
   const currentValue = getNoteValue(round, weapon, activeTab, type);
   applySkillBoxHighlight(box, type, currentValue);
+  updateCellEntryState(box, round, weapon, type);
   return box;
 }
 
@@ -681,6 +682,7 @@ function updateTabUI(box, round, weapon, type) {
   });
   const value = getNoteValue(round, weapon, activeTab, type);
   applySkillBoxHighlight(box, type, value);
+  updateCellEntryState(box, round, weapon, type);
 }
 
 function createInputArea(round, weapon, type, tabKey) {
@@ -704,9 +706,11 @@ function createInputArea(round, weapon, type, tabKey) {
   input.addEventListener('focus', () => openSuggestList(input, suggestList));
   input.addEventListener('input', () => {
     setNoteValue(round, weapon, tabKey, type, input.value || '');
+    const box = input.closest('.skill-box');
     if (getCellTab(round, weapon, type) === tabKey) {
-      applySkillBoxHighlight(input.closest('.skill-box'), type, input.value || '');
+      applySkillBoxHighlight(box, type, input.value || '');
     }
+    updateCellEntryState(box, round, weapon, type);
     openSuggestList(input, suggestList);
     saveStorage();
   });
@@ -743,9 +747,11 @@ function openSuggestList(input, suggestList) {
     btn.addEventListener('click', () => {
       input.value = skill;
       setNoteValue(Number(input.dataset.round), input.dataset.weapon, input.dataset.tab, input.dataset.type, skill);
+      const box = input.closest('.skill-box');
       if (getCellTab(Number(input.dataset.round), input.dataset.weapon, input.dataset.type) === input.dataset.tab) {
-        applySkillBoxHighlight(input.closest('.skill-box'), input.dataset.type, skill);
+        applySkillBoxHighlight(box, input.dataset.type, skill);
       }
+      updateCellEntryState(box, Number(input.dataset.round), input.dataset.weapon, input.dataset.type);
       suggestList.classList.add('hidden');
       saveStorage();
     });
@@ -766,6 +772,18 @@ function applySkillBoxHighlight(skillBox, type, value) {
   const trimmed = String(value || '').trim();
   skillBox.classList.toggle('series-match', type === 'series' && state.requiredSeries.includes(trimmed) && !!trimmed);
   skillBox.classList.toggle('group-match', type === 'group' && state.requiredGroup.includes(trimmed) && !!trimmed);
+}
+
+function updateCellEntryState(skillBox, round, weapon, type) {
+  if (!skillBox) return;
+  let hasAnyValue = false;
+  skillBox.querySelectorAll('.cell-tab-btn').forEach((btn, index) => {
+    const tabKey = TAB_KEYS[index];
+    const hasValue = !!String(getNoteValue(round, weapon, tabKey, type) || '').trim();
+    btn.classList.toggle('has-entry', hasValue);
+    if (hasValue) hasAnyValue = true;
+  });
+  skillBox.classList.toggle('has-entry', hasAnyValue);
 }
 
 function deleteRoundAt(targetRound, fromTop = false) {
