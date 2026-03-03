@@ -50,8 +50,10 @@
           <label class="control-label">操作</label>
           <div class="action-buttons">
             <button id="save-cache-btn" class="btn btn-primary" type="button">保存</button>
+            <button id="delete-first-round-btn" class="btn btn-secondary" type="button">1回目を削除</button>
             <button id="clear-btn" class="btn btn-danger" type="button">メモをクリア</button>
           </div>
+          <p class="control-help">「1回目を削除」で上から詰めて回数を繰り上げます。</p>
           <p id="save-message" class="control-help status-text"></p>
         </div>
       </div>
@@ -74,6 +76,7 @@
       <div class="legend-row">
         <div class="legend-item"><span class="legend-dot legend-series"></span><span>シリーズ必要スキル一致</span></div>
         <div class="legend-item"><span class="legend-dot legend-group"></span><span>グループ必要スキル一致</span></div>
+        <div class="legend-item"><span class="legend-dot legend-completed"></span><span>完了チェック済みの行</span></div>
       </div>
     </section>
 

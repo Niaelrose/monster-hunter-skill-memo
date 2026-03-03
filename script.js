@@ -1,18 +1,26 @@
-const APP_STORAGE_KEY = 'lotteryMemoTool_static_v1';
+const APP_STORAGE_KEY = 'lotteryMemoTool_v3';
 const MAX_ROUNDS = 30;
 const REQUIRED_LIMIT = 10;
 const MOBILE_BREAKPOINT = 768;
+const TAB_KEYS = ['attribute', 'attack', 'critical'];
+const TAB_LABELS = {
+  attribute: '属性',
+  attack: '攻撃',
+  critical: '会心'
+};
 
 const SAMPLE_MASTER = {
-  weapons: ['大剣', '太刀', '片手剣', '双剣', 'ハンマー', '狩猟笛', 'ランス', 'ガンランス', 'スラアク', 'チャアク', '操虫棍', 'ライト', 'ヘビィ', '弓'],
-  seriesSkills: ['火竜の力', '泡狐竜の力', '白熾龍の脈動', '凶爪竜の力', '雷顎竜の力', '雪獅子の力'],
-  groupSkills: ['鱗張りの技法', '守勢の構え', '集中整備', '連撃補助', '毛皮の昂揚', '狙撃支援']
+  weapons: ['大剣', '太刀', '片手剣', '双剣', 'ランス', 'ライト'],
+  seriesSkills: ['火竜の力', '雷顎竜の闘志', '白熾龍の脈動', '泡狐竜の力', '氷牙竜の執念'],
+  groupSkills: ['鱗張りの技法', '守勢の構え', '連撃強化', 'スタミナ補助', '回避の極意']
 };
 
 const state = {
-  master: structuredClone(SAMPLE_MASTER),
+  master: deepClone(SAMPLE_MASTER),
   roundCount: 7,
   notes: {},
+  roundStates: {},
+  cellTabs: {},
   requiredSeries: [],
   requiredGroup: [],
   visibleWeapons: [],
@@ -24,8 +32,8 @@ const state = {
 
 const els = {
   roundCount: document.getElementById('round-count'),
-  memoTable: document.getElementById('memo-table'),
   saveCacheBtn: document.getElementById('save-cache-btn'),
+  deleteFirstRoundBtn: document.getElementById('delete-first-round-btn'),
   clearBtn: document.getElementById('clear-btn'),
   saveMessage: document.getElementById('save-message'),
 
@@ -49,6 +57,7 @@ const els = {
   filterClearAllBtn: document.getElementById('filter-clear-all-btn'),
   filterToggleBtn: document.getElementById('filter-toggle-btn'),
 
+  memoTable: document.getElementById('memo-table'),
   desktopSection: document.getElementById('desktop-section'),
   mobileSection: document.getElementById('mobile-section'),
   mobileCardArea: document.getElementById('mobile-card-area'),
@@ -106,9 +115,15 @@ function bindEvents() {
     showStatus('保存しました。');
   });
 
+  els.deleteFirstRoundBtn.addEventListener('click', () => {
+    deleteRoundAt(1, true);
+  });
+
   els.clearBtn.addEventListener('click', () => {
-    if (!window.confirm('メモ内容をクリアします。よろしいですか？')) return;
+    if (!window.confirm('メモ内容をすべてクリアします。よろしいですか？')) return;
     state.notes = {};
+    state.roundStates = {};
+    state.cellTabs = {};
     requestRender();
     saveStorage();
     showStatus('メモをクリアしました。');
@@ -161,7 +176,7 @@ function bindEvents() {
   els.saveMasterBtn.addEventListener('click', saveMasterFromForm);
   els.resetMasterBtn.addEventListener('click', resetMasterToCurrent);
   els.loadSampleMasterBtn.addEventListener('click', () => {
-    state.master = structuredClone(SAMPLE_MASTER);
+    state.master = deepClone(SAMPLE_MASTER);
     fillMasterForm();
     showStatus('サンプルを読み込みました。');
   });
@@ -207,6 +222,8 @@ function loadStorage() {
     state.master = parsed.master || state.master;
     state.roundCount = clampNumber(parsed.roundCount, 1, MAX_ROUNDS, 7);
     state.notes = parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {};
+    state.roundStates = parsed.roundStates && typeof parsed.roundStates === 'object' ? parsed.roundStates : {};
+    state.cellTabs = parsed.cellTabs && typeof parsed.cellTabs === 'object' ? parsed.cellTabs : {};
     state.requiredSeries = Array.isArray(parsed.requiredSeries) ? parsed.requiredSeries.slice(0, REQUIRED_LIMIT) : [];
     state.requiredGroup = Array.isArray(parsed.requiredGroup) ? parsed.requiredGroup.slice(0, REQUIRED_LIMIT) : [];
     state.visibleWeapons = Array.isArray(parsed.visibleWeapons) ? parsed.visibleWeapons : [];
@@ -222,6 +239,8 @@ function saveStorage() {
     master: state.master,
     roundCount: state.roundCount,
     notes: state.notes,
+    roundStates: state.roundStates,
+    cellTabs: state.cellTabs,
     requiredSeries: state.requiredSeries,
     requiredGroup: state.requiredGroup,
     visibleWeapons: state.visibleWeapons,
@@ -234,11 +253,13 @@ function exportJson() {
   const payload = {
     exportedAt: new Date().toISOString(),
     app: 'lotteryMemoTool',
-    version: 1,
+    version: 2,
     data: {
       master: state.master,
       roundCount: state.roundCount,
       notes: state.notes,
+      roundStates: state.roundStates,
+      cellTabs: state.cellTabs,
       requiredSeries: state.requiredSeries,
       requiredGroup: state.requiredGroup,
       visibleWeapons: state.visibleWeapons,
@@ -269,6 +290,8 @@ function importJson(event) {
       state.master = data.master || state.master;
       state.roundCount = clampNumber(data.roundCount, 1, MAX_ROUNDS, 7);
       state.notes = data.notes && typeof data.notes === 'object' ? data.notes : {};
+      state.roundStates = data.roundStates && typeof data.roundStates === 'object' ? data.roundStates : {};
+      state.cellTabs = data.cellTabs && typeof data.cellTabs === 'object' ? data.cellTabs : {};
       state.requiredSeries = Array.isArray(data.requiredSeries) ? data.requiredSeries.slice(0, REQUIRED_LIMIT) : [];
       state.requiredGroup = Array.isArray(data.requiredGroup) ? data.requiredGroup.slice(0, REQUIRED_LIMIT) : [];
       state.visibleWeapons = Array.isArray(data.visibleWeapons) ? data.visibleWeapons : [];
@@ -314,18 +337,9 @@ function saveMasterFromForm() {
     groupSkills: parseLineList(els.masterGroup.value)
   };
 
-  if (!nextMaster.weapons.length) {
-    alert('武器種は1件以上必要です。');
-    return;
-  }
-  if (!nextMaster.seriesSkills.length) {
-    alert('シリーズスキルは1件以上必要です。');
-    return;
-  }
-  if (!nextMaster.groupSkills.length) {
-    alert('グループスキルは1件以上必要です。');
-    return;
-  }
+  if (!nextMaster.weapons.length) return alert('武器種は1件以上必要です。');
+  if (!nextMaster.seriesSkills.length) return alert('シリーズスキルは1件以上必要です。');
+  if (!nextMaster.groupSkills.length) return alert('グループスキルは1件以上必要です。');
 
   state.master = nextMaster;
   state.visibleWeapons = state.visibleWeapons.filter(v => nextMaster.weapons.includes(v));
@@ -347,12 +361,7 @@ function resetMasterToCurrent() {
 }
 
 function parseLineList(text) {
-  return uniqueKeepOrder(
-    String(text || '')
-      .split(/\r?\n/)
-      .map(v => v.trim())
-      .filter(Boolean)
-  );
+  return uniqueKeepOrder(String(text || '').split(/\r?\n/).map(v => v.trim()).filter(Boolean));
 }
 
 function renderWeaponFilters() {
@@ -399,13 +408,17 @@ function renderSkillModal() {
   els.modalCountText.textContent = `${selectedList.length} / ${REQUIRED_LIMIT}`;
   els.skillList.innerHTML = '';
 
-  sourceList.filter(skill => !keyword || normalizeText(skill).includes(keyword)).forEach(skill => {
-    const wrap = document.createElement('label');
-    wrap.className = 'skill-option';
-    wrap.innerHTML = `<input type="checkbox" ${selectedList.includes(skill) ? 'checked' : ''}><span class="skill-option-text">${escapeHtml(skill)}</span>`;
-    wrap.querySelector('input').addEventListener('change', (event) => updateRequiredList(isSeries ? 'series' : 'group', skill, event.target.checked));
-    els.skillList.appendChild(wrap);
-  });
+  sourceList
+    .filter(skill => !keyword || normalizeText(skill).includes(keyword))
+    .forEach(skill => {
+      const wrap = document.createElement('label');
+      wrap.className = 'skill-option';
+      wrap.innerHTML = `<input type="checkbox" ${selectedList.includes(skill) ? 'checked' : ''}><span class="skill-option-text">${escapeHtml(skill)}</span>`;
+      wrap.querySelector('input').addEventListener('change', (event) => {
+        updateRequiredList(isSeries ? 'series' : 'group', skill, event.target.checked);
+      });
+      els.skillList.appendChild(wrap);
+    });
 }
 
 function updateRequiredList(type, skill, shouldAdd) {
@@ -482,6 +495,7 @@ function renderDesktopTable() {
     els.memoTable.innerHTML = '<tr><td style="padding:16px;">表示対象の武器種がありません。</td></tr>';
     return;
   }
+
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
   headRow.innerHTML = '<th class="corner-head">回数</th>';
@@ -497,10 +511,13 @@ function renderDesktopTable() {
   const tbody = document.createElement('tbody');
   for (let round = 1; round <= state.roundCount; round++) {
     const tr = document.createElement('tr');
+    if (isRoundCompleted(round)) tr.classList.add('completed-row');
+
     const label = document.createElement('td');
     label.className = `round-label round-tone-${(round - 1) % 7}`;
-    label.innerHTML = `<div class="round-label-inner"><span>${round}回目</span><small>シリーズ / グループ</small></div>`;
+    label.appendChild(createRoundLabel(round, false));
     tr.appendChild(label);
+
     weapons.forEach(weapon => {
       const td = document.createElement('td');
       td.className = 'memo-cell';
@@ -519,11 +536,32 @@ function renderMobileCards() {
     els.mobileCardArea.innerHTML = '<div class="control-help">表示対象の武器種がありません。</div>';
     return;
   }
+
   const fragment = document.createDocumentFragment();
   for (let round = 1; round <= state.roundCount; round++) {
     const card = document.createElement('section');
-    card.className = 'round-card';
-    card.innerHTML = `<div class="round-card-head round-tone-${(round - 1) % 7}">${round}回目</div>`;
+    card.className = `round-card ${isRoundCompleted(round) ? 'completed-card' : ''}`;
+
+    const head = document.createElement('div');
+    head.className = `round-card-head round-tone-${(round - 1) % 7}`;
+    head.textContent = `${round}回目`;
+    card.appendChild(head);
+
+    const meta = document.createElement('div');
+    meta.className = 'round-card-meta';
+    meta.appendChild(createRoundCompleteToggle(round));
+
+    const actions = document.createElement('div');
+    actions.className = 'round-card-actions';
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'round-delete-btn';
+    deleteBtn.textContent = 'この回を削除';
+    deleteBtn.addEventListener('click', () => deleteRoundAt(round));
+    actions.appendChild(deleteBtn);
+    meta.appendChild(actions);
+    card.appendChild(meta);
+
     const body = document.createElement('div');
     body.className = 'round-card-body';
     weapons.forEach(weapon => {
@@ -539,34 +577,125 @@ function renderMobileCards() {
   els.mobileCardArea.appendChild(fragment);
 }
 
-function createCellContent(round, weapon) {
+function createRoundLabel(round) {
   const wrap = document.createElement('div');
-  wrap.className = 'cell-stack';
-  wrap.appendChild(createSkillBox(round, weapon, 'series'));
-  wrap.appendChild(createSkillBox(round, weapon, 'group'));
+  wrap.className = 'round-label-inner';
+
+  const top = document.createElement('div');
+  top.className = 'round-label-top';
+  top.innerHTML = `<span>${round}回目</span>`;
+  wrap.appendChild(top);
+
+  const small = document.createElement('small');
+  small.textContent = '属性 / 攻撃 / 会心';
+  wrap.appendChild(small);
+
+  const controls = document.createElement('div');
+  controls.className = 'round-control-row';
+  controls.appendChild(createRoundCompleteToggle(round));
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'round-delete-btn';
+  deleteBtn.textContent = round === 1 ? '先頭削除' : 'この回を削除';
+  deleteBtn.addEventListener('click', () => deleteRoundAt(round, round === 1));
+  controls.appendChild(deleteBtn);
+  wrap.appendChild(controls);
+
   return wrap;
 }
 
-function createSkillBox(round, weapon, type) {
-  const value = getNoteValue(round, weapon, type);
-  const matched = type === 'series'
-    ? state.requiredSeries.includes(value.trim()) && !!value.trim()
-    : state.requiredGroup.includes(value.trim()) && !!value.trim();
+function createRoundCompleteToggle(round) {
+  const label = document.createElement('label');
+  label.innerHTML = `<input class="round-complete-checkbox" type="checkbox" ${isRoundCompleted(round) ? 'checked' : ''}><span>完了</span>`;
+  const checkbox = label.querySelector('input');
+  label.style.display = 'inline-flex';
+  label.style.alignItems = 'center';
+  label.style.gap = '6px';
+  label.style.fontWeight = '700';
+  checkbox.addEventListener('change', () => {
+    setRoundCompleted(round, checkbox.checked);
+    requestRender();
+    saveStorage();
+  });
+  return label;
+}
 
+function createCellContent(round, weapon) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cell-stack';
+  wrap.appendChild(createTabbedSkillBox(round, weapon, 'series'));
+  wrap.appendChild(createTabbedSkillBox(round, weapon, 'group'));
+  return wrap;
+}
+
+function createTabbedSkillBox(round, weapon, type) {
   const box = document.createElement('div');
-  box.className = `skill-box ${matched ? (type === 'series' ? 'series-match' : 'group-match') : ''}`;
-  box.innerHTML = `<label class="skill-box-label">${type === 'series' ? 'シリーズスキル' : 'グループスキル'}</label>`;
+  box.className = 'skill-box';
 
+  const label = document.createElement('label');
+  label.className = 'skill-box-label';
+  label.textContent = type === 'series' ? 'シリーズスキル' : 'グループスキル';
+  box.appendChild(label);
+
+  const tabs = document.createElement('div');
+  tabs.className = 'cell-tabs';
+  box.appendChild(tabs);
+
+  const activeTab = getCellTab(round, weapon, type);
+  const panelWrap = document.createElement('div');
+  box.appendChild(panelWrap);
+
+  TAB_KEYS.forEach(tabKey => {
+    const tabBtn = document.createElement('button');
+    tabBtn.type = 'button';
+    tabBtn.className = `cell-tab-btn ${activeTab === tabKey ? 'is-active' : ''}`;
+    tabBtn.textContent = TAB_LABELS[tabKey];
+    tabBtn.addEventListener('click', () => {
+      setCellTab(round, weapon, type, tabKey);
+      updateTabUI(box, round, weapon, type);
+      saveStorage();
+    });
+    tabs.appendChild(tabBtn);
+
+    const panel = document.createElement('div');
+    panel.className = `tab-panel ${activeTab === tabKey ? 'is-active' : ''}`;
+    panel.dataset.tab = tabKey;
+    panel.appendChild(createInputArea(round, weapon, type, tabKey));
+    panelWrap.appendChild(panel);
+  });
+
+  const currentValue = getNoteValue(round, weapon, activeTab, type);
+  applySkillBoxHighlight(box, type, currentValue);
+  return box;
+}
+
+function updateTabUI(box, round, weapon, type) {
+  const activeTab = getCellTab(round, weapon, type);
+  box.querySelectorAll('.cell-tab-btn').forEach((btn, index) => {
+    const tabKey = TAB_KEYS[index];
+    btn.classList.toggle('is-active', tabKey === activeTab);
+  });
+  box.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.toggle('is-active', panel.dataset.tab === activeTab);
+  });
+  const value = getNoteValue(round, weapon, activeTab, type);
+  applySkillBoxHighlight(box, type, value);
+}
+
+function createInputArea(round, weapon, type, tabKey) {
   const suggestWrap = document.createElement('div');
   suggestWrap.className = 'suggest-wrap';
+
   const input = document.createElement('input');
   input.className = 'skill-input';
   input.type = 'text';
-  input.value = value;
-  input.placeholder = '入力または候補から選択';
+  input.value = getNoteValue(round, weapon, tabKey, type);
+  input.placeholder = `${TAB_LABELS[tabKey]} / 入力または候補から選択`;
   input.dataset.round = String(round);
   input.dataset.weapon = weapon;
   input.dataset.type = type;
+  input.dataset.tab = tabKey;
   input.autocomplete = 'off';
 
   const suggestList = document.createElement('div');
@@ -574,8 +703,10 @@ function createSkillBox(round, weapon, type) {
 
   input.addEventListener('focus', () => openSuggestList(input, suggestList));
   input.addEventListener('input', () => {
-    setNoteValue(round, weapon, type, input.value || '');
-    updateInputHighlight(input, type, input.value || '');
+    setNoteValue(round, weapon, tabKey, type, input.value || '');
+    if (getCellTab(round, weapon, type) === tabKey) {
+      applySkillBoxHighlight(input.closest('.skill-box'), type, input.value || '');
+    }
     openSuggestList(input, suggestList);
     saveStorage();
   });
@@ -587,8 +718,7 @@ function createSkillBox(round, weapon, type) {
 
   suggestWrap.appendChild(input);
   suggestWrap.appendChild(suggestList);
-  box.appendChild(suggestWrap);
-  return box;
+  return suggestWrap;
 }
 
 function openSuggestList(input, suggestList) {
@@ -596,12 +726,14 @@ function openSuggestList(input, suggestList) {
   const keyword = normalizeText(input.value);
   const source = input.dataset.type === 'series' ? state.master.seriesSkills : state.master.groupSkills;
   const filtered = source.filter(skill => !keyword || normalizeText(skill).includes(keyword)).slice(0, 50);
+
   suggestList.innerHTML = '';
   if (!filtered.length) {
     suggestList.innerHTML = '<div class="suggest-empty">候補がありません</div>';
     suggestList.classList.remove('hidden');
     return;
   }
+
   filtered.forEach(skill => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -610,8 +742,10 @@ function openSuggestList(input, suggestList) {
     btn.addEventListener('mousedown', event => event.preventDefault());
     btn.addEventListener('click', () => {
       input.value = skill;
-      setNoteValue(Number(input.dataset.round), input.dataset.weapon, input.dataset.type, skill);
-      updateInputHighlight(input, input.dataset.type, skill);
+      setNoteValue(Number(input.dataset.round), input.dataset.weapon, input.dataset.tab, input.dataset.type, skill);
+      if (getCellTab(Number(input.dataset.round), input.dataset.weapon, input.dataset.type) === input.dataset.tab) {
+        applySkillBoxHighlight(input.closest('.skill-box'), input.dataset.type, skill);
+      }
       suggestList.classList.add('hidden');
       saveStorage();
     });
@@ -627,27 +761,104 @@ function closeAllSuggestLists(except) {
   });
 }
 
-function updateInputHighlight(input, type, value) {
-  const skillBox = input.closest('.skill-box');
+function applySkillBoxHighlight(skillBox, type, value) {
   if (!skillBox) return;
-  skillBox.classList.toggle('series-match', type === 'series' && state.requiredSeries.includes(value.trim()) && !!value.trim());
-  skillBox.classList.toggle('group-match', type === 'group' && state.requiredGroup.includes(value.trim()) && !!value.trim());
+  const trimmed = String(value || '').trim();
+  skillBox.classList.toggle('series-match', type === 'series' && state.requiredSeries.includes(trimmed) && !!trimmed);
+  skillBox.classList.toggle('group-match', type === 'group' && state.requiredGroup.includes(trimmed) && !!trimmed);
+}
+
+function deleteRoundAt(targetRound, fromTop = false) {
+  if (state.roundCount < 1) return;
+  const label = fromTop ? '1回目を削除して、下の行を繰り上げます。よろしいですか？' : `${targetRound}回目を削除して、下の行を繰り上げます。よろしいですか？`;
+  if (!window.confirm(label)) return;
+
+  const nextNotes = {};
+  const nextRoundStates = {};
+  const nextCellTabs = {};
+
+  for (let round = 1; round <= state.roundCount; round++) {
+    if (round === targetRound) continue;
+    const newRound = round > targetRound ? round - 1 : round;
+
+    for (const weapon of state.master.weapons) {
+      for (const type of ['series', 'group']) {
+        TAB_KEYS.forEach(tabKey => {
+          const value = getNoteValue(round, weapon, tabKey, type);
+          if (value) nextNotes[getNoteKey(newRound, weapon, tabKey, type)] = value;
+        });
+        const tabState = getCellTab(round, weapon, type, false);
+        if (tabState) nextCellTabs[getCellTabKey(newRound, weapon, type)] = tabState;
+      }
+    }
+
+    if (isRoundCompleted(round)) {
+      nextRoundStates[newRound] = true;
+    }
+  }
+
+  state.notes = nextNotes;
+  state.roundStates = nextRoundStates;
+  state.cellTabs = nextCellTabs;
+  state.roundCount = Math.max(1, state.roundCount - 1);
+  els.roundCount.value = String(state.roundCount);
+  requestRender();
+  saveStorage();
+  showStatus(`${targetRound}回目を削除しました。`);
 }
 
 function getVisibleWeapons() {
   return state.master.weapons.filter(weapon => state.visibleWeapons.includes(weapon));
 }
 
-function getNoteKey(round, weapon, type) {
+function getRoundStateKey(round) {
+  return String(round);
+}
+
+function isRoundCompleted(round) {
+  return !!state.roundStates[getRoundStateKey(round)];
+}
+
+function setRoundCompleted(round, isCompleted) {
+  const key = getRoundStateKey(round);
+  if (isCompleted) {
+    state.roundStates[key] = true;
+  } else {
+    delete state.roundStates[key];
+  }
+}
+
+function getCellTabKey(round, weapon, type) {
   return `${round}__${weapon}__${type}`;
 }
 
-function getNoteValue(round, weapon, type) {
-  return state.notes[getNoteKey(round, weapon, type)] || '';
+function getCellTab(round, weapon, type, ensureDefault = true) {
+  const key = getCellTabKey(round, weapon, type);
+  if (!state.cellTabs[key] && ensureDefault) {
+    state.cellTabs[key] = 'attribute';
+  }
+  return state.cellTabs[key] || '';
 }
 
-function setNoteValue(round, weapon, type, value) {
-  state.notes[getNoteKey(round, weapon, type)] = value;
+function setCellTab(round, weapon, type, tabKey) {
+  state.cellTabs[getCellTabKey(round, weapon, type)] = tabKey;
+}
+
+function getNoteKey(round, weapon, tabKey, type) {
+  return `${round}__${weapon}__${tabKey}__${type}`;
+}
+
+function getNoteValue(round, weapon, tabKey, type) {
+  return state.notes[getNoteKey(round, weapon, tabKey, type)] || '';
+}
+
+function setNoteValue(round, weapon, tabKey, type, value) {
+  const key = getNoteKey(round, weapon, tabKey, type);
+  if (value) {
+    state.notes[key] = value;
+  } else {
+    delete state.notes[key];
+  }
 }
 
 function normalizeText(text) {
@@ -696,8 +907,14 @@ function debounce(fn, wait) {
   };
 }
 
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function showStatus(message) {
   els.saveMessage.textContent = message;
   clearTimeout(showStatus.timer);
-  showStatus.timer = setTimeout(() => { els.saveMessage.textContent = ''; }, 2500);
+  showStatus.timer = setTimeout(() => {
+    els.saveMessage.textContent = '';
+  }, 2600);
 }
