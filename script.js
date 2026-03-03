@@ -624,65 +624,60 @@ function createRoundCompleteToggle(round) {
 function createCellContent(round, weapon) {
   const wrap = document.createElement('div');
   wrap.className = 'cell-stack';
-  wrap.appendChild(createTabbedSkillBox(round, weapon, 'series'));
-  wrap.appendChild(createTabbedSkillBox(round, weapon, 'group'));
+  wrap.dataset.round = String(round);
+  wrap.dataset.weapon = weapon;
+
+  wrap.appendChild(createSharedCellTabs(round, weapon));
+
+  const activeTab = getCellTab(round, weapon);
+  wrap.appendChild(createSkillBoxForActiveTab(round, weapon, 'series', activeTab));
+  wrap.appendChild(createSkillBoxForActiveTab(round, weapon, 'group', activeTab));
+
+  updateCellEntryState(wrap, round, weapon);
   return wrap;
 }
 
-function createTabbedSkillBox(round, weapon, type) {
+function createSharedCellTabs(round, weapon) {
+  const tabs = document.createElement('div');
+  tabs.className = 'cell-tabs shared-cell-tabs';
+
+  const activeTab = getCellTab(round, weapon);
+
+  TAB_KEYS.forEach(tabKey => {
+    const tabBtn = document.createElement('button');
+    tabBtn.type = 'button';
+    tabBtn.className = 'cell-tab-btn';
+    tabBtn.dataset.tab = tabKey;
+    tabBtn.textContent = TAB_LABELS[tabKey];
+    tabBtn.classList.toggle('is-active', activeTab === tabKey);
+    tabBtn.classList.toggle('has-entry', isTabComplete(round, weapon, tabKey));
+    tabBtn.addEventListener('click', () => {
+      setCellTab(round, weapon, tabKey);
+      requestRender();
+      saveStorage();
+    });
+    tabs.appendChild(tabBtn);
+  });
+
+  return tabs;
+}
+
+function createSkillBoxForActiveTab(round, weapon, type, activeTab) {
   const box = document.createElement('div');
   box.className = 'skill-box';
+  box.dataset.type = type;
 
   const label = document.createElement('label');
   label.className = 'skill-box-label';
   label.textContent = type === 'series' ? 'シリーズスキル' : 'グループスキル';
   box.appendChild(label);
 
-  const tabs = document.createElement('div');
-  tabs.className = 'cell-tabs';
-  box.appendChild(tabs);
-
-  const activeTab = getCellTab(round, weapon, type);
-  const panelWrap = document.createElement('div');
-  box.appendChild(panelWrap);
-
-  TAB_KEYS.forEach(tabKey => {
-    const tabBtn = document.createElement('button');
-    tabBtn.type = 'button';
-    tabBtn.className = `cell-tab-btn ${activeTab === tabKey ? 'is-active' : ''}`;
-    tabBtn.textContent = TAB_LABELS[tabKey];
-    tabBtn.addEventListener('click', () => {
-      setCellTab(round, weapon, type, tabKey);
-      updateTabUI(box, round, weapon, type);
-      saveStorage();
-    });
-    tabs.appendChild(tabBtn);
-
-    const panel = document.createElement('div');
-    panel.className = `tab-panel ${activeTab === tabKey ? 'is-active' : ''}`;
-    panel.dataset.tab = tabKey;
-    panel.appendChild(createInputArea(round, weapon, type, tabKey));
-    panelWrap.appendChild(panel);
-  });
+  box.appendChild(createInputArea(round, weapon, type, activeTab));
 
   const currentValue = getNoteValue(round, weapon, activeTab, type);
   applySkillBoxHighlight(box, type, currentValue);
-  updateCellEntryState(box, round, weapon, type);
+  box.classList.toggle('has-entry', isTabComplete(round, weapon, activeTab));
   return box;
-}
-
-function updateTabUI(box, round, weapon, type) {
-  const activeTab = getCellTab(round, weapon, type);
-  box.querySelectorAll('.cell-tab-btn').forEach((btn, index) => {
-    const tabKey = TAB_KEYS[index];
-    btn.classList.toggle('is-active', tabKey === activeTab);
-  });
-  box.querySelectorAll('.tab-panel').forEach(panel => {
-    panel.classList.toggle('is-active', panel.dataset.tab === activeTab);
-  });
-  const value = getNoteValue(round, weapon, activeTab, type);
-  applySkillBoxHighlight(box, type, value);
-  updateCellEntryState(box, round, weapon, type);
 }
 
 function createInputArea(round, weapon, type, tabKey) {
@@ -705,12 +700,12 @@ function createInputArea(round, weapon, type, tabKey) {
 
   input.addEventListener('focus', () => openSuggestList(input, suggestList));
   input.addEventListener('input', () => {
-    setNoteValue(round, weapon, tabKey, type, input.value || '');
-    const box = input.closest('.skill-box');
-    if (getCellTab(round, weapon, type) === tabKey) {
-      applySkillBoxHighlight(box, type, input.value || '');
-    }
-    updateCellEntryState(box, round, weapon, type);
+    const roundNum = Number(input.dataset.round);
+    setNoteValue(roundNum, weapon, tabKey, type, input.value || '');
+    const skillBox = input.closest('.skill-box');
+    const cellWrap = input.closest('.cell-stack');
+    applySkillBoxHighlight(skillBox, type, input.value || '');
+    updateCellEntryState(cellWrap, roundNum, weapon);
     openSuggestList(input, suggestList);
     saveStorage();
   });
@@ -745,13 +740,13 @@ function openSuggestList(input, suggestList) {
     btn.textContent = skill;
     btn.addEventListener('mousedown', event => event.preventDefault());
     btn.addEventListener('click', () => {
+      const roundNum = Number(input.dataset.round);
       input.value = skill;
-      setNoteValue(Number(input.dataset.round), input.dataset.weapon, input.dataset.tab, input.dataset.type, skill);
-      const box = input.closest('.skill-box');
-      if (getCellTab(Number(input.dataset.round), input.dataset.weapon, input.dataset.type) === input.dataset.tab) {
-        applySkillBoxHighlight(box, input.dataset.type, skill);
-      }
-      updateCellEntryState(box, Number(input.dataset.round), input.dataset.weapon, input.dataset.type);
+      setNoteValue(roundNum, input.dataset.weapon, input.dataset.tab, input.dataset.type, skill);
+      const skillBox = input.closest('.skill-box');
+      const cellWrap = input.closest('.cell-stack');
+      applySkillBoxHighlight(skillBox, input.dataset.type, skill);
+      updateCellEntryState(cellWrap, roundNum, input.dataset.weapon);
       suggestList.classList.add('hidden');
       saveStorage();
     });
@@ -774,16 +769,28 @@ function applySkillBoxHighlight(skillBox, type, value) {
   skillBox.classList.toggle('group-match', type === 'group' && state.requiredGroup.includes(trimmed) && !!trimmed);
 }
 
-function updateCellEntryState(skillBox, round, weapon, type) {
-  if (!skillBox) return;
-  let hasAnyValue = false;
-  skillBox.querySelectorAll('.cell-tab-btn').forEach((btn, index) => {
-    const tabKey = TAB_KEYS[index];
-    const hasValue = !!String(getNoteValue(round, weapon, tabKey, type) || '').trim();
-    btn.classList.toggle('has-entry', hasValue);
-    if (hasValue) hasAnyValue = true;
+function updateCellEntryState(cellWrap, round, weapon) {
+  if (!cellWrap) return;
+  const activeTab = getCellTab(round, weapon);
+  const isActiveComplete = isTabComplete(round, weapon, activeTab);
+
+  cellWrap.classList.toggle('tab-complete', isActiveComplete);
+
+  cellWrap.querySelectorAll('.cell-tab-btn').forEach(btn => {
+    const tabKey = btn.dataset.tab;
+    btn.classList.toggle('is-active', tabKey === activeTab);
+    btn.classList.toggle('has-entry', isTabComplete(round, weapon, tabKey));
   });
-  skillBox.classList.toggle('has-entry', hasAnyValue);
+
+  cellWrap.querySelectorAll('.skill-box').forEach(box => {
+    box.classList.toggle('has-entry', isActiveComplete);
+  });
+}
+
+function isTabComplete(round, weapon, tabKey) {
+  const series = String(getNoteValue(round, weapon, tabKey, 'series') || '').trim();
+  const group = String(getNoteValue(round, weapon, tabKey, 'group') || '').trim();
+  return !!series && !!group;
 }
 
 function deleteRoundAt(targetRound, fromTop = false) {
@@ -805,9 +812,9 @@ function deleteRoundAt(targetRound, fromTop = false) {
           const value = getNoteValue(round, weapon, tabKey, type);
           if (value) nextNotes[getNoteKey(newRound, weapon, tabKey, type)] = value;
         });
-        const tabState = getCellTab(round, weapon, type, false);
-        if (tabState) nextCellTabs[getCellTabKey(newRound, weapon, type)] = tabState;
       }
+      const tabState = getCellTab(round, weapon, false);
+      if (tabState) nextCellTabs[getCellTabKey(newRound, weapon)] = tabState;
     }
 
     if (isRoundCompleted(round)) {
@@ -846,20 +853,20 @@ function setRoundCompleted(round, isCompleted) {
   }
 }
 
-function getCellTabKey(round, weapon, type) {
-  return `${round}__${weapon}__${type}`;
+function getCellTabKey(round, weapon) {
+  return `${round}__${weapon}`;
 }
 
-function getCellTab(round, weapon, type, ensureDefault = true) {
-  const key = getCellTabKey(round, weapon, type);
+function getCellTab(round, weapon, ensureDefault = true) {
+  const key = getCellTabKey(round, weapon);
   if (!state.cellTabs[key] && ensureDefault) {
     state.cellTabs[key] = 'attribute';
   }
   return state.cellTabs[key] || '';
 }
 
-function setCellTab(round, weapon, type, tabKey) {
-  state.cellTabs[getCellTabKey(round, weapon, type)] = tabKey;
+function setCellTab(round, weapon, tabKey) {
+  state.cellTabs[getCellTabKey(round, weapon)] = tabKey;
 }
 
 function getNoteKey(round, weapon, tabKey, type) {
